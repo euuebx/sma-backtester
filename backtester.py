@@ -105,9 +105,33 @@ def plot(result, ticker, path):
     fig.savefig(path, dpi=150)
 
 
+def ask(prompt, default=None, check=None):
+    """Prompt until the answer passes `check`; empty input uses `default`."""
+    while True:
+        text = input(prompt).strip()
+        if not text and default is not None:
+            return default
+        if not text:
+            continue
+        if check is None:
+            return text
+        try:
+            return check(text)
+        except ValueError as exc:
+            print(f"  {exc}")
+
+
+def valid_date(text):
+    try:
+        return pd.to_datetime(text, format="%Y-%m-%d").strftime("%Y-%m-%d")
+    except ValueError:
+        raise ValueError("Please use the format YYYY-MM-DD, e.g. 2015-01-31")
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("ticker")
+    p.add_argument("ticker", nargs="?",
+                   help="stock symbol, e.g. AAPL (leave out to be asked)")
     p.add_argument("--start", default="2010-01-01")
     p.add_argument("--end", default="2026-01-01")
     p.add_argument("--fast", type=int, default=50)
@@ -115,6 +139,14 @@ def main():
     p.add_argument("--cost", type=float, default=0.001)
     p.add_argument("--plot", default="equity_curve.png")
     args = p.parse_args()
+
+    if args.ticker is None:
+        args.ticker = ask("Stock ticker (e.g. AAPL, MSFT, SPY): ").upper()
+        args.start = ask(f"Start date YYYY-MM-DD [{args.start}]: ",
+                         default=args.start, check=valid_date)
+        args.end = ask(f"End date YYYY-MM-DD [{args.end}]: ",
+                       default=args.end, check=valid_date)
+        print()
 
     prices = load_prices(args.ticker, args.start, args.end)
     signal = sma_signal(prices, args.fast, args.slow)
